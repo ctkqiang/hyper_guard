@@ -137,6 +137,28 @@ class InstallInterceptor private constructor(private val activity: Activity) {
         }
     }
 
+    class InstallReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_PACKAGE_ADDED ||
+                intent?.action == "android.intent.action.PACKAGE_INSTALL") {
+                val packageName = intent.data?.schemeSpecificPart ?: return
+                Log.d("InstallReceiver", "Package install intercepted: $packageName")
+
+                if (intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) {
+                    return
+                }
+
+                val activity = context as? Activity ?: return
+                val interceptor = try {
+                    InstallInterceptor.getInstance(activity)
+                } catch (e: Exception) {
+                    InstallInterceptor(activity)
+                }
+                interceptor.showInstallDialog(packageName, "")
+            }
+        }
+    }
+
     fun onDestroy() {
         unregister()
         callback = null

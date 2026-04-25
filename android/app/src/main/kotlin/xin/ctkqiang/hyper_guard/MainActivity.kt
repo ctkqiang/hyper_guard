@@ -178,7 +178,7 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun installToSandboxInternal(apkPath: String): Map<String, Any> {
+    private fun installToSandboxInternal(apkPath: String): Map<String, Any?> {
         val appId = UUID.randomUUID().toString()
         val packageName = extractPackageName(apkPath)
         val appName = extractAppName(apkPath) ?: "Unknown APK"
@@ -268,7 +268,7 @@ class MainActivity : FlutterActivity() {
         Log.d(TAG, "Sandbox terminated: $appId")
     }
 
-    private fun getActiveSandboxAppsInternal(): List<Map<String, Any>> {
+    private fun getActiveSandboxAppsInternal(): List<Map<String, Any?>> {
         return activeSandboxes.values.map { session ->
             mapOf(
                 "id" to session.id,

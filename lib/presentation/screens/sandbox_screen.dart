@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../widgets/nezha_card.dart';
 import '../widgets/nezha_app_bar.dart';
 import '../widgets/nezha_button.dart';
 import '../widgets/sandbox_app_tile.dart';
@@ -41,7 +40,7 @@ class SandboxScreen extends StatelessWidget {
                       ? _buildLoadingState()
                       : state.status == SandboxStatus.error &&
                             state.activeApps.isEmpty
-                      ? _buildErrorState(state)
+                      ? _buildErrorState(context, state)
                       : state.activeApps.isEmpty
                       ? _buildEmptyState(context)
                       : _buildSandboxList(context, state),
@@ -153,7 +152,7 @@ class SandboxScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildErrorState(SandboxState state) {
+  Widget _buildErrorState(BuildContext context, SandboxState state) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),

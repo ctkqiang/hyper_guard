@@ -1,5 +1,4 @@
 import 'package:equatable/equatable.dart';
-import '../../../data/models/sandbox_app.dart';
 import '../../../data/models/security_report.dart';
 
 abstract class SandboxEvent extends Equatable {
