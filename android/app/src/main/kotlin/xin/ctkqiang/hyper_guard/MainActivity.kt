@@ -1,6 +1,7 @@
 package xin.ctkqiang.hyper_guard
 
 import android.app.AlertDialog
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -30,19 +31,15 @@ class MainActivity : FlutterActivity() {
     private lateinit var installInterceptor: InstallInterceptor
     private val activeSandboxes = ConcurrentHashMap<String, SandboxSession>()
     private val reportStore = mutableListOf<JSONObject>()
-    private val fakeDataProfile = generateFakeDataProfile()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (!DeviceUtil.isXiaomiDevice()) {
-            showIncompatibleDialog("此设备非小米/红米设备", "HyperGuard 无法运行")
+            showIncompatibleDialog("Device Not Supported", "HyperGuard requires a Xiaomi device with HyperOS.")
             return
         }
         if (!DeviceUtil.isHyperOS()) {
-            showIncompatibleDialog(
-                "需要 HyperOS 澎湃系统",
-                "请升级至 HyperOS 后使用 HyperGuard"
-            )
+            showIncompatibleDialog("HyperOS Required", "Please upgrade to HyperOS to use HyperGuard.")
             return
         }
         installInterceptor = InstallInterceptor.getInstance(this)
@@ -50,14 +47,21 @@ class MainActivity : FlutterActivity() {
             override fun onInstallRequested(packageName: String, apkPath: String) {
                 installInterceptor.showInstallDialog(packageName, apkPath)
             }
-
-            override fun onInstallTypeSelected(type: InstallInterceptor.InstallType) {
+            override fun onInstallTypeSelected(type: InstallInterceptor.InstallType, apkPath: String) {
                 when (type) {
                     InstallInterceptor.InstallType.SANDBOX_INSTALL -> {
-                        Log.d(TAG, "Sandbox install flow initiated")
+                        sandboxExecutor.execute {
+                            val app = installToSandboxInternal(apkPath)
+                            mainHandler.post {
+                                flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
+                                    MethodChannel(messenger, CHANNEL_SANDBOX)
+                                        .invokeMethod("onSandboxAppInstalled", app)
+                                }
+                            }
+                        }
                     }
                     InstallInterceptor.InstallType.NORMAL_INSTALL -> {
-                        Log.d(TAG, "Normal install flow initiated")
+                        installInterceptor.installApkNormal(apkPath)
                     }
                 }
             }
@@ -67,27 +71,19 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-
-        MethodChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            CHANNEL_DEVICE
-        ).setMethodCallHandler(::handleDeviceChannel)
-
-        MethodChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            CHANNEL_SANDBOX
-        ).setMethodCallHandler(::handleSandboxChannel)
-
-        MethodChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            CHANNEL_MONITOR
-        ).setMethodCallHandler(::handleMonitorChannel)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_DEVICE)
+            .setMethodCallHandler(::handleDeviceChannel)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_SANDBOX)
+            .setMethodCallHandler(::handleSandboxChannel)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_MONITOR)
+            .setMethodCallHandler(::handleMonitorChannel)
     }
 
     private fun handleDeviceChannel(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "isXiaomiDevice" -> result.success(DeviceUtil.isXiaomiDevice())
             "isHyperOS" -> result.success(DeviceUtil.isHyperOS())
+            "getHyperOSVersion" -> result.success(DeviceUtil.getHyperOSVersion())
             "getDeviceInfo" -> result.success(DeviceUtil.getDeviceInfo())
             else -> result.notImplemented()
         }
@@ -96,14 +92,13 @@ class MainActivity : FlutterActivity() {
     private fun handleSandboxChannel(call: MethodCall, result: MethodChannel.Result) {
         sandboxExecutor.execute {
             when (call.method) {
-                "initializeSandbox" -> {
-                    val success = initializeSandboxInternal()
-                    mainHandler.post { result.success(success) }
+                "initializeSandbox" -> mainHandler.post {
+                    result.success(initializeSandboxInternal())
                 }
                 "installToSandbox" -> {
                     val apkPath = call.argument<String>("apkPath") ?: ""
-                    val sandboxApp = installToSandboxInternal(apkPath)
-                    mainHandler.post { result.success(sandboxApp) }
+                    val app = installToSandboxInternal(apkPath)
+                    mainHandler.post { result.success(app) }
                 }
                 "startAnalysis" -> {
                     val appId = call.argument<String>("appId") ?: ""
@@ -111,21 +106,19 @@ class MainActivity : FlutterActivity() {
                     mainHandler.post { result.success(true) }
                 }
                 "stopSandbox" -> {
-                    val appId = call.argument<String>("appId") ?: ""
-                    stopSandboxInternal(appId)
+                    stopSandboxInternal(call.argument<String>("appId") ?: "")
                     mainHandler.post { result.success(true) }
                 }
                 "terminateSandbox" -> {
-                    val appId = call.argument<String>("appId") ?: ""
-                    terminateSandboxInternal(appId)
+                    terminateSandboxInternal(call.argument<String>("appId") ?: "")
                     mainHandler.post { result.success(true) }
                 }
                 "getFakeDataProfile" -> {
-                    mainHandler.post { result.success(fakeDataProfile) }
+                    val appId = call.argument<String>("appId") ?: ""
+                    mainHandler.post { result.success(buildSandboxProfile(appId)) }
                 }
-                "getActiveSandboxApps" -> {
-                    val apps = getActiveSandboxAppsInternal()
-                    mainHandler.post { result.success(apps) }
+                "getActiveSandboxApps" -> mainHandler.post {
+                    result.success(getActiveSandboxAppsInternal())
                 }
                 else -> mainHandler.post { result.notImplemented() }
             }
@@ -135,25 +128,20 @@ class MainActivity : FlutterActivity() {
     private fun handleMonitorChannel(call: MethodCall, result: MethodChannel.Result) {
         sandboxExecutor.execute {
             when (call.method) {
-                "generateReport" -> {
-                    val sandboxAppId = call.argument<String>("sandboxAppId") ?: ""
-                    val report = generateReportInternal(sandboxAppId)
-                    mainHandler.post { result.success(report) }
+                "generateReport" -> mainHandler.post {
+                    result.success(generateReportInternal(call.argument<String>("sandboxAppId") ?: ""))
                 }
-                "getReportHistory" -> {
-                    val reports = getReportHistoryInternal()
-                    mainHandler.post { result.success(reports) }
+                "getReportHistory" -> mainHandler.post {
+                    result.success(getReportHistoryInternal())
                 }
-                "deleteReport" -> {
-                    val reportId = call.argument<String>("reportId") ?: ""
-                    val deleted = deleteReportInternal(reportId)
-                    mainHandler.post { result.success(deleted) }
+                "deleteReport" -> mainHandler.post {
+                    result.success(deleteReportInternal(call.argument<String>("reportId") ?: ""))
                 }
-                "exportReport" -> {
-                    val reportId = call.argument<String>("reportId") ?: ""
-                    val format = call.argument<String>("format") ?: "json"
-                    val exported = exportReportInternal(reportId, format)
-                    mainHandler.post { result.success(exported) }
+                "exportReport" -> mainHandler.post {
+                    result.success(exportReportInternal(
+                        call.argument<String>("reportId") ?: "",
+                        call.argument<String>("format") ?: "json"
+                    ))
                 }
                 else -> mainHandler.post { result.notImplemented() }
             }
@@ -162,52 +150,47 @@ class MainActivity : FlutterActivity() {
 
     private fun initializeSandboxInternal(): Boolean {
         return try {
-            val sandboxDir = File(filesDir, "sandbox")
-            if (!sandboxDir.exists()) {
-                sandboxDir.mkdirs()
-            }
-            val fakeDataDir = File(sandboxDir, "fake_data")
-            if (!fakeDataDir.exists()) {
-                fakeDataDir.mkdirs()
-            }
-            Log.d(TAG, "Sandbox initialized at: ${sandboxDir.absolutePath}")
+            val sandboxRoot = File(filesDir, "hyperguard_sandbox")
+            if (!sandboxRoot.exists()) sandboxRoot.mkdirs()
+            File(sandboxRoot, "sessions").let { if (!it.exists()) it.mkdirs() }
+            File(sandboxRoot, "data_profiles").let { if (!it.exists()) it.mkdirs() }
+            File(sandboxRoot, "network_logs").let { if (!it.exists()) it.mkdirs() }
+            File(sandboxRoot, "exports").let { if (!it.exists()) it.mkdirs() }
+            Log.i(TAG, "Sandbox root initialized: ${sandboxRoot.absolutePath}")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize sandbox", e)
+            Log.e(TAG, "Sandbox initialization failed", e)
             false
         }
     }
 
     private fun installToSandboxInternal(apkPath: String): Map<String, Any?> {
         val appId = UUID.randomUUID().toString()
-        val packageName = extractPackageName(apkPath)
-        val appName = extractAppName(apkPath) ?: "Unknown APK"
-        val sizeBytes = try {
-            File(apkPath).length().toInt()
-        } catch (e: Exception) {
-            0
-        }
+        val resolvedApk = ApkAnalyzer.analyze(apkPath, packageManager)
+        val sessionDir = File(filesDir, "hyperguard_sandbox/sessions/$appId")
+        sessionDir.mkdirs()
 
         val session = SandboxSession(
             id = appId,
-            packageName = packageName,
-            appName = appName,
+            packageName = resolvedApk.packageName,
+            appName = resolvedApk.appName,
             apkPath = apkPath,
-            fakeDataProfile = fakeDataProfile
+            sandboxDir = sessionDir.absolutePath,
+            versionName = resolvedApk.versionName,
+            requestedPermissions = resolvedApk.permissions,
         )
         activeSandboxes[appId] = session
-
-        Log.d(TAG, "APK installed to sandbox: $appName ($packageName)")
+        Log.i(TAG, "Sandbox session created: ${resolvedApk.appName} (${resolvedApk.packageName})")
 
         return mapOf(
             "id" to appId,
-            "packageName" to packageName,
-            "appName" to appName,
-            "iconPath" to null,
-            "sizeBytes" to sizeBytes,
+            "packageName" to resolvedApk.packageName,
+            "appName" to resolvedApk.appName,
+            "iconPath" to resolvedApk.iconPath,
+            "sizeBytes" to resolvedApk.sizeBytes,
             "status" to 0,
             "threatLevel" to 0,
-            "createdTime" to System.currentTimeMillis().toString(),
+            "createdTime" to session.createdTime,
             "completedTime" to null,
             "permissionRequests" to 0,
             "networkRequests" to 0,
@@ -220,70 +203,69 @@ class MainActivity : FlutterActivity() {
         val session = activeSandboxes[appId] ?: return
         session.isAnalyzing = true
 
-        val behaviors = listOf(
-            mapOf(
-                "eventType" to "privacy_access",
-                "description" to "尝试读取通讯录数据 (已返回空数据)",
-                "severity" to "high",
-                "timestamp" to System.currentTimeMillis().toString(),
-                "details" to mapOf("appId" to appId, "target" to "contacts"),
-            ),
-            mapOf(
-                "eventType" to "sms_access",
-                "description" to "尝试读取短信记录 (已返回空数据)",
-                "severity" to "high",
-                "timestamp" to (System.currentTimeMillis() + 1000).toString(),
-                "details" to mapOf("appId" to appId, "target" to "sms"),
-            ),
-            mapOf(
-                "eventType" to "location_access",
-                "description" to "请求 GPS 定位权限 (已返回假位置)",
-                "severity" to "medium",
-                "timestamp" to (System.currentTimeMillis() + 2000).toString(),
-                "details" to mapOf("appId" to appId, "faked" to true),
-            ),
-            mapOf(
-                "eventType" to "network_request",
-                "description" to "发起网络连接请求",
-                "severity" to "low",
-                "timestamp" to (System.currentTimeMillis() + 3000).toString(),
-                "details" to mapOf("appId" to appId, "monitored" to true),
-            ),
-        )
+        val profile = buildSandboxProfile(appId)
+        writeSandboxProfile(session.sandboxDir, profile)
+        session.permissionAttempts = session.requestedPermissions.size
 
-        behaviors.forEach { behavior ->
-            sendBehaviorEventToFlutter(behavior)
+        for (perm in session.requestedPermissions) {
+            val risk = when {
+                perm.contains("CONTACTS") || perm.contains("SMS") || perm.contains("CALL_LOG") -> "critical"
+                perm.contains("LOCATION") || perm.contains("CAMERA") || perm.contains("MICROPHONE") -> "high"
+                perm.contains("STORAGE") || perm.contains("PHONE") -> "medium"
+                else -> "low"
+            }
+            session.blockedActions++
+
+            val event = mapOf(
+                "eventType" to "permission_request",
+                "description" to "Blocked: $perm",
+                "severity" to risk,
+                "timestamp" to System.currentTimeMillis(),
+                "details" to mapOf("appId" to appId, "permission" to perm, "granted" to false, "provisioned" to true),
+            )
+            sendBehaviorEvent(event)
+            session.detectedBehaviors.add("permission_request:$perm")
         }
+
+        session.networkAttempts = session.detectedBehaviors.size
+        Log.i(TAG, "Analysis complete for $appId: ${session.blockedActions} blocked, ${session.permissionAttempts} permissions")
     }
 
     private fun stopSandboxInternal(appId: String) {
-        val session = activeSandboxes[appId] ?: return
-        session.isAnalyzing = false
-        session.isRunning = false
-        Log.d(TAG, "Sandbox stopped: $appId")
+        activeSandboxes[appId]?.let {
+            it.isAnalyzing = false
+            it.isRunning = false
+        }
+        Log.i(TAG, "Sandbox stopped: $appId")
     }
 
     private fun terminateSandboxInternal(appId: String) {
-        activeSandboxes.remove(appId)
-        Log.d(TAG, "Sandbox terminated: $appId")
+        activeSandboxes.remove(appId)?.let { session ->
+            File(session.sandboxDir).deleteRecursively()
+        }
+        Log.i(TAG, "Sandbox terminated: $appId")
     }
 
     private fun getActiveSandboxAppsInternal(): List<Map<String, Any?>> {
-        return activeSandboxes.values.map { session ->
+        return activeSandboxes.values.map { s ->
             mapOf(
-                "id" to session.id,
-                "packageName" to session.packageName,
-                "appName" to session.appName,
+                "id" to s.id,
+                "packageName" to s.packageName,
+                "appName" to s.appName,
                 "iconPath" to null,
                 "sizeBytes" to 0,
-                "status" to if (session.isAnalyzing) 2 else if (session.isRunning) 1 else 0,
-                "threatLevel" to session.threatLevel,
-                "createdTime" to session.createdTime.toString(),
+                "status" to when {
+                    s.isAnalyzing -> 2
+                    s.isRunning -> 1
+                    else -> 0
+                },
+                "threatLevel" to s.threatLevel,
+                "createdTime" to s.createdTime,
                 "completedTime" to null,
-                "permissionRequests" to session.permissionAttempts,
-                "networkRequests" to session.networkAttempts,
-                "blockedActions" to session.blockedActions,
-                "detectedBehaviors" to session.detectedBehaviors.toList(),
+                "permissionRequests" to s.permissionAttempts,
+                "networkRequests" to s.networkAttempts,
+                "blockedActions" to s.blockedActions,
+                "detectedBehaviors" to s.detectedBehaviors.toList(),
             )
         }
     }
@@ -293,123 +275,125 @@ class MainActivity : FlutterActivity() {
         val reportId = UUID.randomUUID().toString()
         val threatScore = calculateThreatScore(session)
 
-        val recommendations = mutableListOf<String>()
-        if (session.permissionAttempts > 3) {
-            recommendations.add("该应用请求了过多权限 (${session.permissionAttempts} 次)，疑似隐私窃取行为")
-        }
-        if (session.networkAttempts > 5) {
-            recommendations.add("该应用发起了大量网络请求 (${session.networkAttempts} 次)，建议检查网络通信目标")
-        }
-        if (threatScore > 60) {
-            recommendations.add("威胁指数较高，强烈建议删除此 APK，不要进行正常安装")
-        } else if (threatScore > 30) {
-            recommendations.add("该应用存在可疑行为，建议谨慎处理")
+        val threatLevel = when {
+            threatScore >= 70 -> "malicious"
+            threatScore >= 40 -> "suspicious"
+            else -> "safe"
         }
 
-        val reportJson = JSONObject().apply {
+        val permEvents = session.requestedPermissions.mapIndexed { index, perm ->
+            JSONObject().apply {
+                put("eventType", "permission_request")
+                put("description", "Requested: $perm")
+                put("severity", when {
+                    perm.contains("CONTACTS") || perm.contains("SMS") -> "critical"
+                    perm.contains("LOCATION") || perm.contains("CAMERA") -> "high"
+                    else -> "medium"
+                })
+                put("timestamp", session.createdTime + index * 100L)
+                put("details", JSONObject().apply {
+                    put("appId", sandboxAppId)
+                    put("permission", perm)
+                    put("blocked", true)
+                })
+            }
+        }
+
+        val recommendations = mutableListOf<String>()
+        val dangerousPerms = session.requestedPermissions.filter {
+            it.contains("SMS") || it.contains("CONTACTS") || it.contains("CALL_LOG") ||
+            it.contains("CAMERA") || it.contains("MICROPHONE") || it.contains("LOCATION")
+        }
+        if (dangerousPerms.isNotEmpty()) {
+            recommendations.add("Requested ${dangerousPerms.size} dangerous permissions that access sensitive user data via sandbox isolation.")
+        }
+        if (threatScore >= 70) {
+            recommendations.add("HIGH RISK: This APK exhibits strong indicators of malicious behavior. Do not install outside the sandbox.")
+        } else if (threatScore >= 40) {
+            recommendations.add("CAUTION: This APK shows suspicious patterns. Recommend sandbox-only usage.")
+        }
+
+        val report = JSONObject().apply {
             put("id", reportId)
             put("sandboxAppId", sandboxAppId)
             put("packageName", session.packageName)
             put("appName", session.appName)
-            put("threatLevel", when {
-                threatScore > 60 -> "malicious"
-                threatScore > 30 -> "suspicious"
-                else -> "safe"
-            })
+            put("threatLevel", threatLevel)
             put("threatScore", threatScore)
-            put("generatedTime", System.currentTimeMillis().toString())
+            put("generatedTime", System.currentTimeMillis())
             put("permissionAttempts", JSONArray())
             put("networkActivities", JSONArray())
-            put("behaviorEvents", JSONArray())
-            put("summary", "在蜜罐沙盒环境中分析了 ${session.appName}。共监测到 ${session.permissionAttempts} 次权限请求、${session.networkAttempts} 次网络活动，拦截了 ${session.blockedActions} 次敏感操作。")
+            put("behaviorEvents", JSONArray(permEvents))
+            put("summary", "Analysis of ${session.appName} (${session.packageName}). ${session.requestedPermissions.size} permissions requested, ${session.blockedActions} blocked. Threat score: $threatScore.")
             put("recommendations", JSONArray(recommendations))
         }
-
-        reportStore.add(reportJson)
-
-        return try {
-            jsonToMap(reportJson)
-        } catch (e: Exception) {
-            null
-        }
+        reportStore.add(report)
+        return jsonToMap(report)
     }
 
     private fun getReportHistoryInternal(): List<Map<String, Any>> {
-        return reportStore.mapNotNull { report ->
-            try {
-                jsonToMap(report)
-            } catch (e: Exception) {
-                null
-            }
-        }
+        return reportStore.mapNotNull { jsonToMap(it) }
     }
 
     private fun deleteReportInternal(reportId: String): Boolean {
-        val removed = reportStore.removeAll { report ->
-            report.optString("id") == reportId
-        }
-        return removed
+        return reportStore.removeAll { it.optString("id") == reportId }
     }
 
     private fun exportReportInternal(reportId: String, format: String): Boolean {
         val report = reportStore.find { it.optString("id") == reportId } ?: return false
         return try {
-            val exportDir = File(filesDir, "exports")
+            val exportDir = File(filesDir, "hyperguard_sandbox/exports")
             if (!exportDir.exists()) exportDir.mkdirs()
-            val exportFile = File(exportDir, "report_$reportId.$format")
-            exportFile.writeText(report.toString(2))
-            Log.d(TAG, "Report exported to: ${exportFile.absolutePath}")
+            File(exportDir, "report_$reportId.$format").writeText(report.toString(2))
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to export report", e)
+            Log.e(TAG, "Export failed", e)
             false
         }
     }
 
-    private fun sendBehaviorEventToFlutter(behavior: Map<String, Any>) {
+    private fun sendBehaviorEvent(event: Map<String, Any>) {
         mainHandler.post {
             try {
                 flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
-                    MethodChannel(messenger, CHANNEL_SANDBOX).invokeMethod(
-                        "onBehaviorEvent",
-                        behavior
-                    )
+                    MethodChannel(messenger, CHANNEL_SANDBOX)
+                        .invokeMethod("onBehaviorEvent", event)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to send behavior event", e)
+                Log.e(TAG, "Event send failed", e)
             }
         }
     }
 
     private fun calculateThreatScore(session: SandboxSession): Int {
         var score = 0
-        score += session.permissionAttempts * 10
-        score += session.networkAttempts * 5
-        score += session.blockedActions * 15
+        val perms = session.requestedPermissions
+        for (perm in perms) {
+            when {
+                perm.contains("SMS") || perm.contains("CONTACTS") || perm.contains("CALL_LOG") -> score += 25
+                perm.contains("CAMERA") || perm.contains("MICROPHONE") || perm.contains("LOCATION") -> score += 15
+                perm.contains("STORAGE") || perm.contains("PHONE") -> score += 10
+                else -> score += 5
+            }
+        }
+        score += session.networkAttempts * 3
         return score.coerceIn(0, 100)
     }
 
-    private fun extractPackageName(apkPath: String): String {
-        return "com.mock.${UUID.randomUUID().toString().take(8)}"
-    }
-
-    private fun extractAppName(apkPath: String): String? {
-        return File(apkPath).nameWithoutExtension
-    }
-
-    private fun generateFakeDataProfile(): Map<String, String> {
-        return mapOf(
-            "imei" to "866262050000000",
-            "androidId" to "9774d56d682e549c",
-            "serial" to "unknown",
+    private fun buildSandboxProfile(appId: String): Map<String, String> {
+        val deviceInfo = DeviceUtil.getDeviceInfo()
+        return mapOf<String, String>(
+            "imei" to "000000000000000",
+            "androidId" to appId.take(16),
+            "serial" to "0000000000000000",
             "macAddress" to "02:00:00:00:00:00",
-            "phoneNumber" to "+8613800000000",
-            "simSerial" to "89860000000000000000",
-            "latitude" to "39.9042",
-            "longitude" to "116.4074",
-            "deviceModel" to "M2012K11AC",
+            "phoneNumber" to "00000000000",
+            "simSerial" to "00000000000000000000",
+            "latitude" to "0.0",
+            "longitude" to "0.0",
+            "deviceModel" to (deviceInfo["model"] ?: "Xiaomi"),
             "manufacturer" to "Xiaomi",
-            "brand" to "Redmi",
+            "brand" to (deviceInfo["brand"] ?: "Xiaomi"),
             "contactsCount" to "0",
             "smsCount" to "0",
             "callLogCount" to "0",
@@ -417,12 +401,19 @@ class MainActivity : FlutterActivity() {
         )
     }
 
+    private fun writeSandboxProfile(sandboxDir: String, profile: Map<String, String>) {
+        val profileFile = File(sandboxDir, "sandbox_profile.json")
+        val json = JSONObject()
+        profile.forEach { (k, v) -> json.put(k, v) }
+        profileFile.writeText(json.toString(2))
+    }
+
     private fun showIncompatibleDialog(title: String, message: String) {
         AlertDialog.Builder(this).apply {
             setTitle(title)
             setMessage(message)
             setCancelable(false)
-            setPositiveButton("退出") { _, _ -> finishAffinity() }
+            setPositiveButton("Exit") { _, _ -> finishAffinity() }
         }.show()
     }
 
@@ -435,19 +426,21 @@ class MainActivity : FlutterActivity() {
             when (value) {
                 is JSONObject -> map[key] = jsonToMap(value)
                 is JSONArray -> map[key] = jsonArrayToList(value)
+                is Long -> map[key] = value.toInt().let { if (it.toLong() == value) it else value }
                 else -> map[key] = value
             }
         }
         return map
     }
 
-    private fun jsonArrayToList(jsonArray: JSONArray): List<Any> {
+    private fun jsonArrayToList(arr: JSONArray): List<Any> {
         val list = mutableListOf<Any>()
-        for (i in 0 until jsonArray.length()) {
-            val value = jsonArray.get(i)
+        for (i in 0 until arr.length()) {
+            val value = arr.get(i)
             when (value) {
                 is JSONObject -> list.add(jsonToMap(value))
                 is JSONArray -> list.add(jsonArrayToList(value))
+                is Long -> list.add(value.toInt().let { if (it.toLong() == value) it else value })
                 else -> list.add(value)
             }
         }
@@ -465,8 +458,10 @@ class MainActivity : FlutterActivity() {
         val packageName: String,
         val appName: String,
         val apkPath: String,
-        val fakeDataProfile: Map<String, String>,
+        val sandboxDir: String,
         val createdTime: Long = System.currentTimeMillis(),
+        val versionName: String = "unknown",
+        val requestedPermissions: List<String> = emptyList(),
         var isRunning: Boolean = true,
         var isAnalyzing: Boolean = false,
         var threatLevel: Int = 0,
@@ -475,4 +470,57 @@ class MainActivity : FlutterActivity() {
         var blockedActions: Int = 0,
         val detectedBehaviors: MutableList<String> = mutableListOf(),
     )
+}
+
+object ApkAnalyzer {
+    data class ApkInfo(
+        val packageName: String,
+        val appName: String,
+        val versionName: String,
+        val iconPath: String?,
+        val sizeBytes: Int,
+        val permissions: List<String>,
+    )
+
+    fun analyze(apkPath: String, pm: PackageManager): ApkInfo {
+        val apkFile = File(apkPath)
+        return try {
+            val info = pm.getPackageArchiveInfo(apkPath, PackageManager.GET_PERMISSIONS)
+            if (info != null) {
+                val appName = info.applicationInfo?.let {
+                    pm.getApplicationLabel(it).toString()
+                } ?: apkFile.nameWithoutExtension
+
+                val permissions = info.requestedPermissions?.toList() ?: emptyList()
+
+                ApkInfo(
+                    packageName = info.packageName,
+                    appName = appName,
+                    versionName = info.versionName ?: "unknown",
+                    iconPath = null,
+                    sizeBytes = apkFile.length().toInt(),
+                    permissions = permissions,
+                )
+            } else {
+                ApkInfo(
+                    packageName = "unknown.${UUID.randomUUID().toString().take(8)}",
+                    appName = apkFile.nameWithoutExtension,
+                    versionName = "unknown",
+                    iconPath = null,
+                    sizeBytes = apkFile.length().toInt(),
+                    permissions = emptyList(),
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("ApkAnalyzer", "Failed to analyze APK: $apkPath", e)
+            ApkInfo(
+                packageName = "unknown.${UUID.randomUUID().toString().take(8)}",
+                appName = apkFile.nameWithoutExtension,
+                versionName = "unknown",
+                iconPath = null,
+                sizeBytes = apkFile.length().toInt(),
+                permissions = emptyList(),
+            )
+        }
+    }
 }

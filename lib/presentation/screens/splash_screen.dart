@@ -1,11 +1,10 @@
-import 'package:animations/animations.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../core/theme/theme_colors.dart';
 import '../bloc/device/device_bloc.dart';
 import '../bloc/device/device_event.dart';
 import '../bloc/device/device_state.dart';
-import '../../core/theme/app_theme.dart';
 import 'home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -15,125 +14,125 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulseController;
-  late final Animation<double> _pulseAnimation;
+class _SplashScreenState extends State<SplashScreen> {
+  int _step = 0;
+  Timer? _timer;
+
+  final List<String> _statusTexts = [
+    '验证设备安全环境',
+    '检测 HyperOS 系统完整性',
+    '初始化蜜罐沙盒引擎',
+    '防护系统就绪',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
+    _timer = Timer.periodic(const Duration(milliseconds: 900), (_) {
+      if (!mounted) return;
+      setState(() => _step = (_step + 1) % _statusTexts.length);
+    });
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = ThemeColors.of(context);
     return BlocListener<DeviceBloc, DeviceState>(
-      listener: (context, state) {
+      listener: (ctx, state) {
         if (state.status == DeviceValidationStatus.compatible) {
-          Navigator.of(context).pushReplacement(
+          _timer?.cancel();
+          Navigator.of(ctx).pushReplacement(
             PageRouteBuilder(
-              pageBuilder: (_, __, ___) => const HomeScreen(),
-              transitionDuration: const Duration(milliseconds: 600),
-              transitionsBuilder: (_, animation, __, child) {
-                return FadeScaleTransition(animation: animation, child: child);
-              },
+              pageBuilder: (_, a, b) => const HomeScreen(),
+              transitionDuration: const Duration(milliseconds: 400),
+              transitionsBuilder: (_, a, b, c) =>
+                  FadeTransition(opacity: a, child: c),
             ),
           );
         }
       },
       child: Scaffold(
         body: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppTheme.bgDeep, AppTheme.bgSurface, AppTheme.bgDeep],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedBuilder(
-                  animation: _pulseAnimation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: child,
-                    );
-                  },
-                  child: Container(
-                    width: 100,
-                    height: 100,
+          decoration: BoxDecoration(color: colors.background),
+          child: SafeArea(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Spacer(flex: 3),
+                  Container(
+                    width: 88,
+                    height: 88,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: AppTheme.primaryGradient,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primaryNeon.withValues(alpha: 0.5),
-                          blurRadius: 40,
-                          spreadRadius: 8,
+                      borderRadius: BorderRadius.circular(24),
+                      gradient: colors.brandGradient,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Image.asset(
+                        'assets/applogo.png',
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Text(
+                    'HyperGuard',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: colors.textPrimary,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '澎湃盾',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: colors.brandLight,
+                      letterSpacing: 6,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'HyperOS Security Sandbox',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colors.textMuted,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const Spacer(flex: 2),
+                  BlocBuilder<DeviceBloc, DeviceState>(
+                    builder: (ctx, state) {
+                      return switch (state.status) {
+                        DeviceValidationStatus.checking ||
+                        DeviceValidationStatus.initial => _checking(colors),
+                        DeviceValidationStatus.incompatible => _incompatible(
+                          state.errorMessage,
+                          colors,
+                          ctx,
                         ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.shield_rounded,
-                      color: Colors.black,
-                      size: 48,
-                    ),
+                        DeviceValidationStatus.error => _retry(
+                          state.errorMessage,
+                          colors,
+                          ctx,
+                        ),
+                        _ => const SizedBox.shrink(),
+                      };
+                    },
                   ),
-                ),
-                const SizedBox(height: 32),
-                Text(
-                  'HyperGuard',
-                  style: GoogleFonts.orbitron(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 4,
-                    color: AppTheme.primaryNeon,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '澎湃盾',
-                  style: GoogleFonts.orbitron(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 6,
-                    color: AppTheme.shieldGold,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                BlocBuilder<DeviceBloc, DeviceState>(
-                  builder: (context, state) {
-                    switch (state.status) {
-                      case DeviceValidationStatus.checking:
-                        return _buildCheckingWidget();
-                      case DeviceValidationStatus.initial:
-                        return _buildCheckingWidget();
-                      case DeviceValidationStatus.incompatible:
-                        return _buildIncompatibleWidget(state.errorMessage);
-                      case DeviceValidationStatus.error:
-                        return _buildRetryWidget(state.errorMessage);
-                      default:
-                        return const SizedBox.shrink();
-                    }
-                  },
-                ),
-              ],
+                  const Spacer(flex: 3),
+                ],
+              ),
             ),
           ),
         ),
@@ -141,123 +140,129 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  Widget _buildCheckingWidget() {
+  Widget _checking(ThemeColors colors) {
     return Column(
       children: [
-        const SizedBox(
-          width: 28,
-          height: 28,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryNeon),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: Text(
+            _statusTexts[_step],
+            key: ValueKey(_step),
+            style: TextStyle(fontSize: 13, color: colors.textSecondary),
           ),
         ),
-        const SizedBox(height: 16),
-        const Text(
-          '正在验证设备安全环境...',
-          style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+        const SizedBox(height: 18),
+        SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            valueColor: AlwaysStoppedAnimation<Color>(colors.brandLight),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildIncompatibleWidget(String? message) {
+  Widget _incompatible(String? msg, ThemeColors colors, BuildContext ctx) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 48),
       child: Column(
         children: [
-          const Icon(
-            Icons.gpp_bad_rounded,
-            color: AppTheme.accentDanger,
-            size: 48,
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: colors.danger.withValues(alpha: 0.1),
+            ),
+            child: Icon(
+              Icons.smartphone_rounded,
+              color: colors.danger,
+              size: 28,
+            ),
           ),
           const SizedBox(height: 16),
           Text(
-            message ?? '设备不兼容',
+            msg ?? '设备不兼容',
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: AppTheme.textSecondary,
+              color: colors.textSecondary,
               height: 1.6,
             ),
           ),
-          const SizedBox(height: 24),
-          NezhaSmallButton(
-            label: '退出应用',
-            onPressed: () {},
-            color: AppTheme.accentDanger,
+          const SizedBox(height: 20),
+          GestureDetector(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+              decoration: BoxDecoration(
+                color: colors.danger.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                '退出应用',
+                style: TextStyle(
+                  color: colors.danger,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRetryWidget(String? message) {
+  Widget _retry(String? msg, ThemeColors colors, BuildContext ctx) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 48),
       child: Column(
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: AppTheme.accentWarning,
-            size: 48,
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: colors.warning.withValues(alpha: 0.1),
+            ),
+            child: Icon(
+              Icons.error_outline_rounded,
+              color: colors.warning,
+              size: 28,
+            ),
           ),
           const SizedBox(height: 16),
           Text(
-            message ?? '检测出错',
+            msg ?? '检测异常',
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: AppTheme.textSecondary,
+              color: colors.textSecondary,
               height: 1.6,
             ),
           ),
-          const SizedBox(height: 24),
-          NezhaSmallButton(
-            label: '重试',
-            onPressed: () {
-              context.read<DeviceBloc>().add(const CheckDevice());
-            },
-            color: AppTheme.primaryNeon,
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: () => ctx.read<DeviceBloc>().add(const CheckDevice()),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                gradient: colors.brandGradient,
+              ),
+              child: const Text(
+                '重试',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class NezhaSmallButton extends StatelessWidget {
-  final String label;
-  final VoidCallback? onPressed;
-  final Color color;
-
-  const NezhaSmallButton({
-    super.key,
-    required this.label,
-    this.onPressed,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: color,
-            letterSpacing: 0.8,
-          ),
-        ),
       ),
     );
   }

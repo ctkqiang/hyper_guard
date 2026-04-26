@@ -21,18 +21,4 @@ class AppConstants {
     'android.permission.READ_SMS',
     'android.permission.REQUEST_INSTALL_PACKAGES',
   };
-
-  static const Map<String, String> fakeDataDefaults = {
-    'imei': '866262050000000',
-    'androidId': '9774d56d682e549c',
-    'serial': 'unknown',
-    'macAddress': '02:00:00:00:00:00',
-    'phoneNumber': '+8613800000000',
-    'simSerial': '89860000000000000000',
-    'latitude': '39.9042',
-    'longitude': '116.4074',
-    'deviceModel': 'M2012K11AC',
-    'manufacturer': 'Xiaomi',
-    'brand': 'Redmi',
-  };
 }

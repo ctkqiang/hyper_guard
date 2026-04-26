@@ -9,12 +9,14 @@ class SandboxService {
     AppConstants.channelSandbox,
   );
 
+  final _appInstalledController = StreamController<SandboxApp>.broadcast();
   final _behaviorStreamController = StreamController<BehaviorEvent>.broadcast();
   final _networkStreamController =
       StreamController<NetworkActivity>.broadcast();
   final _permissionStreamController =
       StreamController<PermissionAttempt>.broadcast();
 
+  Stream<SandboxApp> get appInstalledStream => _appInstalledController.stream;
   Stream<BehaviorEvent> get behaviorStream => _behaviorStreamController.stream;
   Stream<NetworkActivity> get networkStream => _networkStreamController.stream;
   Stream<PermissionAttempt> get permissionStream =>
@@ -26,6 +28,12 @@ class SandboxService {
 
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     switch (call.method) {
+      case 'onSandboxAppInstalled':
+        final app = SandboxApp.fromJson(
+          Map<String, dynamic>.from(call.arguments),
+        );
+        _appInstalledController.add(app);
+        break;
       case 'onBehaviorEvent':
         final event = BehaviorEvent.fromJson(
           Map<String, dynamic>.from(call.arguments),
@@ -130,6 +138,7 @@ class SandboxService {
   }
 
   void dispose() {
+    _appInstalledController.close();
     _behaviorStreamController.close();
     _networkStreamController.close();
     _permissionStreamController.close();

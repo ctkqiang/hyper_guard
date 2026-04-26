@@ -92,10 +92,8 @@ class SandboxApp extends Equatable {
       sizeBytes: json['sizeBytes'] as int,
       status: SandboxAppStatus.values[json['status'] as int],
       threatLevel: ThreatLevel.values[json['threatLevel'] as int],
-      createdTime: DateTime.parse(json['createdTime'] as String),
-      completedTime: json['completedTime'] != null
-          ? DateTime.parse(json['completedTime'] as String)
-          : null,
+      createdTime: _parseDateTime(json['createdTime']),
+      completedTime: _parseDateTimeOrNull(json['completedTime']),
       permissionRequests: json['permissionRequests'] as int? ?? 0,
       networkRequests: json['networkRequests'] as int? ?? 0,
       blockedActions: json['blockedActions'] as int? ?? 0,
@@ -119,4 +117,21 @@ class SandboxApp extends Equatable {
     blockedActions,
     detectedBehaviors,
   ];
+}
+
+DateTime _parseDateTime(dynamic value) {
+  if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+  if (value is String) {
+    final ms = int.tryParse(value);
+    if (ms != null) return DateTime.fromMillisecondsSinceEpoch(ms);
+    try {
+      return DateTime.parse(value);
+    } catch (_) {}
+  }
+  return DateTime.now();
+}
+
+DateTime? _parseDateTimeOrNull(dynamic value) {
+  if (value == null) return null;
+  return _parseDateTime(value);
 }

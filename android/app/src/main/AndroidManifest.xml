@@ -47,7 +47,7 @@
         android:required="true" />
 
     <application
-        android:label="HyperGuard"
+        android:label="澎湃盾"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"

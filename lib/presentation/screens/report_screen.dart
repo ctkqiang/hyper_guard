@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../widgets/nezha_card.dart';
-import '../widgets/nezha_app_bar.dart';
-import '../widgets/nezha_button.dart';
+import '../../core/theme/theme_colors.dart';
+import '../widgets/hyper_card.dart';
+import '../widgets/hyper_app_bar.dart';
+import '../widgets/hyper_button.dart';
 import '../widgets/report_chart.dart';
 import '../bloc/report/report_bloc.dart';
 import '../bloc/report/report_event.dart';
 import '../bloc/report/report_state.dart';
-import '../../core/theme/app_theme.dart';
 import '../../data/models/security_report.dart';
 
 class ReportScreen extends StatelessWidget {
@@ -18,42 +17,31 @@ class ReportScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<ReportBloc, ReportState>(
       builder: (context, state) {
+        final colors = ThemeColors.of(context);
         return Scaffold(
           backgroundColor: Colors.transparent,
-          appBar: NezhaAppBar(
-            title: '安全报告',
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded),
-                onPressed: () {
-                  context.read<ReportBloc>().add(const LoadReportHistory());
-                },
-              ),
-            ],
-          ),
+          appBar: const HyperAppBar(title: '安全报告'),
           body: SafeArea(
             child: state.selectedReport != null
-                ? _buildReportDetail(context, state.selectedReport!)
+                ? _buildDetail(context, state.selectedReport!, colors)
                 : state.status == ReportStatus.loading
-                ? _buildLoadingState()
+                ? Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        colors.brandLight,
+                      ),
+                    ),
+                  )
                 : state.reports.isEmpty
-                ? _buildEmptyState()
-                : _buildReportList(context, state),
+                ? _buildEmpty(colors)
+                : _buildList(context, state, colors),
           ),
         );
       },
     );
   }
 
-  Widget _buildLoadingState() {
-    return const Center(
-      child: CircularProgressIndicator(
-        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryNeon),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
+  Widget _buildEmpty(ThemeColors colors) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -61,38 +49,33 @@ class ReportScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 80,
-              height: 80,
+              width: 72,
+              height: 72,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.accentSuccess.withValues(alpha: 0.1),
-                border: Border.all(
-                  color: AppTheme.accentSuccess.withValues(alpha: 0.3),
-                  width: 2,
-                ),
+                borderRadius: BorderRadius.circular(22),
+                color: colors.success.withValues(alpha: 0.06),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.verified_rounded,
-                color: AppTheme.accentSuccess,
-                size: 40,
+                color: colors.success,
+                size: 36,
               ),
             ),
             const SizedBox(height: 24),
             Text(
               '暂无安全报告',
-              style: GoogleFonts.orbitron(
+              style: TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
-                letterSpacing: 1.5,
+                fontWeight: FontWeight.w600,
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              '在蜜罐沙盒中完成APK分析后\n安全报告将显示在此处',
+            Text(
+              '在蜜罐沙盒中完成 APK 分析后\n安全报告将自动生成',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppTheme.textSecondary,
+                color: colors.textSecondary,
                 fontSize: 13,
                 height: 1.8,
               ),
@@ -103,26 +86,32 @@ class ReportScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildReportList(BuildContext context, ReportState state) {
+  Widget _buildList(
+    BuildContext context,
+    ReportState state,
+    ThemeColors colors,
+  ) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: state.reports.length,
-      itemBuilder: (context, index) {
-        final report = state.reports[index];
+      itemBuilder: (_, i) {
+        final report = state.reports[i];
         return _ReportCard(
           report: report,
-          onTap: () {
-            context.read<ReportBloc>().add(SelectReport(report));
-          },
-          onDelete: () {
-            context.read<ReportBloc>().add(DeleteReport(report.id));
-          },
+          colors: colors,
+          onTap: () => context.read<ReportBloc>().add(SelectReport(report)),
+          onDelete: () =>
+              context.read<ReportBloc>().add(DeleteReport(report.id)),
         );
       },
     );
   }
 
-  Widget _buildReportDetail(BuildContext context, SecurityReport report) {
+  Widget _buildDetail(
+    BuildContext context,
+    SecurityReport report,
+    ThemeColors colors,
+  ) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -130,47 +119,39 @@ class ReportScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              NezhaButton(
-                label: '返回列表',
-                variant: NezhaButtonVariant.ghost,
+              HyperButton(
+                label: '返回',
+                variant: HyperButtonVariant.ghost,
                 icon: Icons.arrow_back_ios_new_rounded,
-                isFullWidth: false,
-                onPressed: () {
-                  context.read<ReportBloc>().add(const ClearSelection());
-                },
+                fullWidth: false,
+                onPressed: () =>
+                    context.read<ReportBloc>().add(const ClearSelection()),
               ),
               const Spacer(),
               IconButton(
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  color: AppTheme.accentDanger,
-                ),
-                onPressed: () {
-                  context.read<ReportBloc>().add(DeleteReport(report.id));
-                },
+                icon: Icon(Icons.delete_outline_rounded, color: colors.danger),
+                onPressed: () =>
+                    context.read<ReportBloc>().add(DeleteReport(report.id)),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          NezhaCard(
+          HyperCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   report.appName,
-                  style: GoogleFonts.orbitron(
+                  style: TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    color: colors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   report.packageName,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
+                  style: TextStyle(fontSize: 12, color: colors.textSecondary),
                 ),
                 const SizedBox(height: 20),
                 ReportChart(report: report),
@@ -178,94 +159,79 @@ class ReportScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _buildBehaviorEvents(report),
+          if (report.behaviorEvents.isNotEmpty)
+            _eventsSection(report.behaviorEvents, colors),
           const SizedBox(height: 16),
-          _buildNetworkActivity(report),
+          if (report.networkActivities.isNotEmpty)
+            _networkSection(report.networkActivities, colors),
           const SizedBox(height: 16),
-          if (report.recommendations.isNotEmpty) _buildRecommendations(report),
+          if (report.recommendations.isNotEmpty)
+            _recommendationsSection(report, colors),
         ],
       ),
     );
   }
 
-  Widget _buildBehaviorEvents(SecurityReport report) {
-    if (report.behaviorEvents.isEmpty) return const SizedBox.shrink();
-
-    return NezhaCard(
+  Widget _eventsSection(List<BehaviorEvent> events, ThemeColors colors) {
+    return HyperCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const NezhaCardHeader(
+          const SectionHeader(
             title: '行为事件',
             icon: Icons.warning_rounded,
-            iconColor: AppTheme.accentWarning,
+            iconColor: null,
           ),
           const SizedBox(height: 12),
-          ...report.behaviorEvents
-              .take(10)
-              .map(
-                (event) => _EventTile(
-                  severity: event.severity,
-                  description: event.description,
-                  timestamp: event.timestamp,
-                ),
-              ),
+          ...events.take(10).map((e) => _EventTile(e, colors)),
         ],
       ),
     );
   }
 
-  Widget _buildNetworkActivity(SecurityReport report) {
-    if (report.networkActivities.isEmpty) return const SizedBox.shrink();
-
-    return NezhaCard(
+  Widget _networkSection(List<NetworkActivity> activities, ThemeColors colors) {
+    return HyperCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const NezhaCardHeader(
+          const SectionHeader(
             title: '网络活动',
             icon: Icons.wifi_tethering_rounded,
-            iconColor: AppTheme.primaryNeon,
+            iconColor: null,
           ),
           const SizedBox(height: 12),
-          ...report.networkActivities
-              .take(10)
-              .map((activity) => _NetworkTile(activity: activity)),
+          ...activities.take(10).map((a) => _NetworkTile(a, colors)),
         ],
       ),
     );
   }
 
-  Widget _buildRecommendations(SecurityReport report) {
-    return NezhaCard(
-      borderColor: AppTheme.accentDanger.withValues(alpha: 0.3),
+  Widget _recommendationsSection(SecurityReport report, ThemeColors colors) {
+    return HyperCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const NezhaCardHeader(
+          const SectionHeader(
             title: '安全建议',
             icon: Icons.lightbulb_rounded,
-            iconColor: AppTheme.accentWarning,
+            iconColor: null,
           ),
           const SizedBox(height: 12),
           ...report.recommendations.map(
-            (rec) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+            (r) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     '• ',
-                    style: TextStyle(
-                      color: AppTheme.accentWarning,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: colors.warning, fontSize: 14),
                   ),
                   Expanded(
                     child: Text(
-                      rec,
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
+                      r,
+                      style: TextStyle(
+                        color: colors.textSecondary,
                         fontSize: 13,
                         height: 1.5,
                       ),
@@ -283,32 +249,31 @@ class ReportScreen extends StatelessWidget {
 
 class _ReportCard extends StatelessWidget {
   final SecurityReport report;
+  final ThemeColors colors;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _ReportCard({
     required this.report,
+    required this.colors,
     required this.onTap,
     required this.onDelete,
   });
 
-  Color get _color {
-    return report.threatScore > 60
-        ? AppTheme.accentDanger
-        : report.threatScore > 30
-        ? AppTheme.accentWarning
-        : AppTheme.accentSuccess;
-  }
-
   @override
   Widget build(BuildContext context) {
+    final color = report.threatScore > 60
+        ? colors.danger
+        : report.threatScore > 30
+        ? colors.warning
+        : colors.success;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.bgCard,
+        color: colors.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderGlow.withValues(alpha: 0.5)),
+        border: Border.all(color: colors.cardBorder, width: 0.5),
       ),
       child: Row(
         children: [
@@ -316,14 +281,14 @@ class _ReportCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: _color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
               report.threatScore > 30
                   ? Icons.warning_rounded
                   : Icons.check_circle_rounded,
-              color: _color,
+              color: color,
               size: 22,
             ),
           ),
@@ -336,19 +301,16 @@ class _ReportCard extends StatelessWidget {
                 children: [
                   Text(
                     report.appName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
+                      color: colors.textPrimary,
                       fontSize: 14,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     report.generatedTime.toString().substring(0, 16),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.textSecondary,
-                    ),
+                    style: TextStyle(fontSize: 11, color: colors.textMuted),
                   ),
                 ],
               ),
@@ -358,18 +320,14 @@ class _ReportCard extends StatelessWidget {
             '威胁 ${report.threatScore}',
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: _color,
+              fontWeight: FontWeight.w600,
+              color: color,
             ),
           ),
           const SizedBox(width: 8),
           GestureDetector(
             onTap: onDelete,
-            child: const Icon(
-              Icons.close_rounded,
-              color: AppTheme.textSecondary,
-              size: 18,
-            ),
+            child: Icon(Icons.close_rounded, color: colors.textMuted, size: 18),
           ),
         ],
       ),
@@ -378,42 +336,27 @@ class _ReportCard extends StatelessWidget {
 }
 
 class _EventTile extends StatelessWidget {
-  final String severity;
-  final String description;
-  final DateTime timestamp;
-
-  const _EventTile({
-    required this.severity,
-    required this.description,
-    required this.timestamp,
-  });
-
-  Color get _severityColor {
-    switch (severity) {
-      case 'critical':
-        return AppTheme.accentDanger;
-      case 'high':
-        return AppTheme.accentWarning;
-      default:
-        return AppTheme.primaryNeon;
-    }
-  }
+  final BehaviorEvent event;
+  final ThemeColors colors;
+  const _EventTile(this.event, this.colors);
 
   @override
   Widget build(BuildContext context) {
+    final color = switch (event.severity) {
+      'critical' => colors.danger,
+      'high' => colors.warning,
+      _ => colors.brandLight,
+    };
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            margin: const EdgeInsets.only(top: 3),
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _severityColor,
-            ),
+            margin: const EdgeInsets.only(top: 4),
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -421,20 +364,17 @@ class _EventTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  description,
-                  style: const TextStyle(
-                    color: AppTheme.textPrimary,
+                  event.description,
+                  style: TextStyle(
+                    color: colors.textPrimary,
                     fontSize: 13,
                     height: 1.4,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  timestamp.toString().substring(11, 19),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppTheme.textSecondary,
-                  ),
+                  event.timestamp.toString().substring(11, 19),
+                  style: TextStyle(fontSize: 10, color: colors.textMuted),
                 ),
               ],
             ),
@@ -447,7 +387,8 @@ class _EventTile extends StatelessWidget {
 
 class _NetworkTile extends StatelessWidget {
   final NetworkActivity activity;
-  const _NetworkTile({required this.activity});
+  final ThemeColors colors;
+  const _NetworkTile(this.activity, this.colors);
 
   @override
   Widget build(BuildContext context) {
@@ -458,9 +399,7 @@ class _NetworkTile extends StatelessWidget {
           Icon(
             activity.encrypted ? Icons.lock_rounded : Icons.lock_open_rounded,
             size: 14,
-            color: activity.encrypted
-                ? AppTheme.accentSuccess
-                : AppTheme.accentWarning,
+            color: activity.encrypted ? colors.success : colors.warning,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -471,17 +410,11 @@ class _NetworkTile extends StatelessWidget {
                   activity.url,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: colors.textPrimary, fontSize: 12),
                 ),
                 Text(
                   '${activity.method}  ${activity.statusCode}  ${activity.timestamp.toString().substring(11, 19)}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppTheme.textSecondary,
-                  ),
+                  style: TextStyle(fontSize: 10, color: colors.textMuted),
                 ),
               ],
             ),

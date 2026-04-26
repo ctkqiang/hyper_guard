@@ -1,83 +1,86 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_colors.dart';
 import '../../data/models/sandbox_app.dart';
-import 'security_status_indicator.dart';
 
-class SandboxAppTile extends StatelessWidget {
+class ThreatBadge extends StatelessWidget {
+  final ThreatLevel threatLevel;
+  final double fontSize;
+
+  const ThreatBadge({super.key, required this.threatLevel, this.fontSize = 11});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = ThemeColors.of(context);
+    final color = switch (threatLevel) {
+      ThreatLevel.safe => colors.success,
+      ThreatLevel.suspicious => colors.warning,
+      ThreatLevel.dangerous || ThreatLevel.malicious => colors.danger,
+    };
+    final icon = switch (threatLevel) {
+      ThreatLevel.safe => Icons.shield_rounded,
+      ThreatLevel.suspicious => Icons.warning_amber_rounded,
+      ThreatLevel.dangerous || ThreatLevel.malicious => Icons.gpp_bad_rounded,
+    };
+    final label = switch (threatLevel) {
+      ThreatLevel.safe => '安全',
+      ThreatLevel.suspicious => '可疑',
+      ThreatLevel.dangerous => '危险',
+      ThreatLevel.malicious => '恶意',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: fontSize + 2, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SandboxAppListTile extends StatelessWidget {
   final SandboxApp app;
   final VoidCallback? onTap;
   final VoidCallback? onStop;
   final VoidCallback? onAnalyze;
-  final VoidCallback? onGenerateReport;
+  final VoidCallback? onReport;
 
-  const SandboxAppTile({
+  const SandboxAppListTile({
     super.key,
     required this.app,
     this.onTap,
     this.onStop,
     this.onAnalyze,
-    this.onGenerateReport,
+    this.onReport,
   });
-
-  String get _sizeText {
-    final mb = app.sizeBytes / (1024 * 1024);
-    return '${mb.toStringAsFixed(1)} MB';
-  }
-
-  String get _durationText {
-    final diff = DateTime.now().difference(app.createdTime);
-    if (diff.inMinutes < 60) {
-      return '${diff.inMinutes} 分钟前';
-    } else if (diff.inHours < 24) {
-      return '${diff.inHours} 小时前';
-    }
-    return '${diff.inDays} 天前';
-  }
-
-  IconData get _statusIcon {
-    switch (app.status) {
-      case SandboxAppStatus.pending:
-        return Icons.hourglass_empty;
-      case SandboxAppStatus.running:
-        return Icons.play_circle_fill_rounded;
-      case SandboxAppStatus.analyzing:
-        return Icons.biotech_rounded;
-      case SandboxAppStatus.completed:
-        return Icons.check_circle_rounded;
-      case SandboxAppStatus.failed:
-        return Icons.error_rounded;
-    }
-  }
-
-  Color get _statusColor {
-    switch (app.status) {
-      case SandboxAppStatus.pending:
-        return AppTheme.textSecondary;
-      case SandboxAppStatus.running:
-        return AppTheme.primaryNeon;
-      case SandboxAppStatus.analyzing:
-        return AppTheme.accentWarning;
-      case SandboxAppStatus.completed:
-        return AppTheme.accentSuccess;
-      case SandboxAppStatus.failed:
-        return AppTheme.accentDanger;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
+    final colors = ThemeColors.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.bgCard,
+          color: colors.card,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppTheme.borderGlow.withValues(alpha: 0.5),
-            width: 1,
-          ),
+          border: Border.all(color: colors.cardBorder, width: 0.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,12 +91,12 @@ class SandboxAppTile extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryNeon.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: colors.brandLight.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.android_rounded,
-                    color: AppTheme.primaryNeon,
+                    color: colors.brandLight,
                     size: 24,
                   ),
                 ),
@@ -104,45 +107,45 @@ class SandboxAppTile extends StatelessWidget {
                     children: [
                       Text(
                         app.appName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
+                          color: colors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         app.packageName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppTheme.textSecondary,
+                          color: colors.textSecondary,
                         ),
                       ),
                     ],
                   ),
                 ),
-                SecurityStatusIndicator(threatLevel: app.threatLevel),
+                ThreatBadge(threatLevel: app.threatLevel),
               ],
             ),
             const SizedBox(height: 14),
             Row(
               children: [
-                _InfoChip(
-                  icon: _statusIcon,
-                  label: _durationText,
-                  color: _statusColor,
+                _Chip(
+                  Icons.hourglass_empty,
+                  _fmtDuration(app.createdTime),
+                  colors.textSecondary,
                 ),
                 const SizedBox(width: 12),
-                _InfoChip(
-                  icon: Icons.storage_rounded,
-                  label: _sizeText,
-                  color: AppTheme.textSecondary,
+                _Chip(
+                  Icons.storage_rounded,
+                  _fmtSize(app.sizeBytes),
+                  colors.textSecondary,
                 ),
                 const SizedBox(width: 12),
-                _InfoChip(
-                  icon: Icons.warning_rounded,
-                  label: '${app.blockedActions} 拦截',
-                  color: AppTheme.accentWarning,
+                _Chip(
+                  Icons.warning_rounded,
+                  '${app.blockedActions} 拦截',
+                  colors.warning,
                 ),
               ],
             ),
@@ -152,21 +155,21 @@ class SandboxAppTile extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: _ActionButton(
-                      icon: Icons.stop_rounded,
-                      label: '停止',
-                      color: AppTheme.accentDanger,
-                      onTap: onStop,
+                    child: _ActionBtn(
+                      Icons.stop_rounded,
+                      '停止',
+                      colors.danger,
+                      onStop,
                     ),
                   ),
                   if (app.status != SandboxAppStatus.analyzing) ...[
                     const SizedBox(width: 10),
                     Expanded(
-                      child: _ActionButton(
-                        icon: Icons.biotech_rounded,
-                        label: '分析',
-                        color: AppTheme.accentWarning,
-                        onTap: onAnalyze,
+                      child: _ActionBtn(
+                        Icons.biotech_rounded,
+                        '深度分析',
+                        colors.warning,
+                        onAnalyze,
                       ),
                     ),
                   ],
@@ -178,11 +181,11 @@ class SandboxAppTile extends StatelessWidget {
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
-                child: _ActionButton(
-                  icon: Icons.description_rounded,
-                  label: '生成报告',
-                  color: AppTheme.primaryNeon,
-                  onTap: onGenerateReport,
+                child: _ActionBtn(
+                  Icons.description_rounded,
+                  '生成安全报告',
+                  colors.brandLight,
+                  onReport,
                 ),
               ),
             ],
@@ -191,18 +194,25 @@ class SandboxAppTile extends StatelessWidget {
       ),
     );
   }
+
+  static String _fmtDuration(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} 分钟前';
+    if (diff.inHours < 24) return '${diff.inHours} 小时前';
+    return '${diff.inDays} 天前';
+  }
+
+  static String _fmtSize(int bytes) {
+    final mb = bytes / (1024 * 1024);
+    return '${mb.toStringAsFixed(1)} MB';
+  }
 }
 
-class _InfoChip extends StatelessWidget {
+class _Chip extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-
-  const _InfoChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  const _Chip(this.icon, this.label, this.color);
 
   @override
   Widget build(BuildContext context) {
@@ -217,18 +227,12 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-class _ActionButton extends StatelessWidget {
+class _ActionBtn extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
   final VoidCallback? onTap;
-
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    this.onTap,
-  });
+  const _ActionBtn(this.icon, this.label, this.color, this.onTap);
 
   @override
   Widget build(BuildContext context) {
@@ -237,9 +241,9 @@ class _ActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.2), width: 0.5),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

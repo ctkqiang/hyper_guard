@@ -82,24 +82,19 @@ class SecurityReport extends Equatable {
       appName: json['appName'] as String,
       threatLevel: json['threatLevel'] as String,
       threatScore: json['threatScore'] as int,
-      generatedTime: DateTime.parse(json['generatedTime'] as String),
-      permissionAttempts:
-          (json['permissionAttempts'] as List<dynamic>?)
-              ?.map(
-                (e) => PermissionAttempt.fromJson(e as Map<String, dynamic>),
-              )
-              .toList() ??
-          [],
-      networkActivities:
-          (json['networkActivities'] as List<dynamic>?)
-              ?.map((e) => NetworkActivity.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      behaviorEvents:
-          (json['behaviorEvents'] as List<dynamic>?)
-              ?.map((e) => BehaviorEvent.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
+      generatedTime: _parseReportTime(json['generatedTime']),
+      permissionAttempts: _parseList(
+        json['permissionAttempts'],
+        PermissionAttempt.fromJson,
+      ),
+      networkActivities: _parseList(
+        json['networkActivities'],
+        NetworkActivity.fromJson,
+      ),
+      behaviorEvents: _parseList(
+        json['behaviorEvents'],
+        BehaviorEvent.fromJson,
+      ),
       summary: json['summary'] as String? ?? '',
       recommendations: List<String>.from(json['recommendations'] ?? []),
     );
@@ -114,11 +109,6 @@ class SecurityReport extends Equatable {
     threatLevel,
     threatScore,
     generatedTime,
-    permissionAttempts,
-    networkActivities,
-    behaviorEvents,
-    summary,
-    recommendations,
   ];
 }
 
@@ -149,14 +139,14 @@ class PermissionAttempt extends Equatable {
     return PermissionAttempt(
       permission: json['permission'] as String,
       granted: json['granted'] as bool,
-      timestamp: DateTime.parse(json['timestamp'] as String),
+      timestamp: _parseReportTime(json['timestamp']),
       risk: json['risk'] as String? ?? 'low',
       details: Map<String, dynamic>.from(json['details'] ?? {}),
     );
   }
 
   @override
-  List<Object?> get props => [permission, granted, timestamp, risk, details];
+  List<Object?> get props => [permission, granted, timestamp, risk];
 }
 
 class NetworkActivity extends Equatable {
@@ -193,7 +183,7 @@ class NetworkActivity extends Equatable {
       url: json['url'] as String,
       method: json['method'] as String,
       statusCode: json['statusCode'] as int,
-      timestamp: DateTime.parse(json['timestamp'] as String),
+      timestamp: _parseReportTime(json['timestamp']),
       encrypted: json['encrypted'] as bool? ?? false,
       ipAddress: json['ipAddress'] as String?,
       details: Map<String, dynamic>.from(json['details'] ?? {}),
@@ -239,17 +229,31 @@ class BehaviorEvent extends Equatable {
       eventType: json['eventType'] as String,
       description: json['description'] as String,
       severity: json['severity'] as String,
-      timestamp: DateTime.parse(json['timestamp'] as String),
+      timestamp: _parseReportTime(json['timestamp']),
       details: Map<String, dynamic>.from(json['details'] ?? {}),
     );
   }
 
   @override
-  List<Object?> get props => [
-    eventType,
-    description,
-    severity,
-    timestamp,
-    details,
-  ];
+  List<Object?> get props => [eventType, description, severity, timestamp];
+}
+
+DateTime _parseReportTime(dynamic value) {
+  if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+  if (value is String) {
+    final ms = int.tryParse(value);
+    if (ms != null) return DateTime.fromMillisecondsSinceEpoch(ms);
+    try {
+      return DateTime.parse(value);
+    } catch (_) {}
+  }
+  return DateTime.now();
+}
+
+List<T> _parseList<T>(
+  dynamic value,
+  T Function(Map<String, dynamic>) fromJson,
+) {
+  if (value is! List) return [];
+  return value.map((e) => fromJson(Map<String, dynamic>.from(e))).toList();
 }

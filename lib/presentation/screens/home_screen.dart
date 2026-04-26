@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../widgets/security_status_indicator.dart';
+import '../../core/theme/theme_colors.dart';
+import '../../data/models/security_report.dart';
+import '../widgets/sandbox_app_tile.dart';
 import '../bloc/sandbox/sandbox_bloc.dart';
 import '../bloc/sandbox/sandbox_event.dart';
 import '../bloc/sandbox/sandbox_state.dart';
 import '../bloc/report/report_bloc.dart';
 import '../bloc/report/report_event.dart';
 import '../bloc/report/report_state.dart';
-import '../../core/theme/app_theme.dart';
-import '../../core/constants/app_constants.dart';
-import '../../data/models/sandbox_app.dart';
-import '../../data/models/security_report.dart';
+import '../bloc/theme/theme_bloc.dart';
+import '../bloc/theme/theme_event.dart';
+import '../bloc/theme/theme_state.dart';
 import 'sandbox_screen.dart';
 import 'report_screen.dart';
 
@@ -23,7 +23,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
+  int _tabIndex = 0;
 
   @override
   void initState() {
@@ -34,74 +34,60 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = ThemeColors.of(context);
     return Scaffold(
-      extendBody: false,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(0),
-        child: Container(),
-      ),
       body: IndexedStack(
-        index: _currentIndex,
+        index: _tabIndex,
         children: [
-          _buildDashboardTab(),
+          _dashboard(colors),
           const SandboxScreen(),
           const ReportScreen(),
-          _buildSettingsTab(),
+          _settings(colors),
         ],
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: _bottomNav(colors),
     );
   }
 
-  Widget _buildDashboardTab() {
+  Widget _dashboard(ThemeColors colors) {
     return SafeArea(
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(),
-            const SizedBox(height: 8),
-            _buildSecurityStatusCard(),
-            const SizedBox(height: 16),
-            _buildQuickActions(),
-            const SizedBox(height: 16),
-            _buildActiveSandboxes(),
-            const SizedBox(height: 16),
-            _buildRecentThreats(),
+            _header(colors),
+            const SizedBox(height: 12),
+            _statusBanner(colors),
+            const SizedBox(height: 20),
+            _quickActions(colors),
             const SizedBox(height: 24),
+            _activeSandboxes(colors),
+            const SizedBox(height: 20),
+            _recentThreats(colors),
+            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryNeon.withValues(alpha: 0.05),
-            Colors.transparent,
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
+  Widget _header(ThemeColors colors) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Row(
         children: [
           Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: AppTheme.primaryGradient,
+              borderRadius: BorderRadius.circular(14),
+              gradient: colors.brandGradient,
             ),
             child: const Icon(
               Icons.shield_rounded,
-              color: Colors.black,
-              size: 24,
+              color: Colors.white,
+              size: 22,
             ),
           ),
           const SizedBox(width: 14),
@@ -109,39 +95,40 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                AppConstants.appNameCN,
-                style: GoogleFonts.orbitron(
-                  fontSize: 20,
+                'HyperGuard',
+                style: TextStyle(
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 2,
-                  color: AppTheme.primaryNeon,
+                  color: colors.textPrimary,
+                  letterSpacing: 1,
                 ),
               ),
               Text(
-                'HyperOS Security Sandbox',
-                style: GoogleFonts.inter(
+                '澎湃盾 · 蜜罐沙盒防护系统',
+                style: TextStyle(
                   fontSize: 11,
-                  color: AppTheme.textSecondary,
-                  letterSpacing: 0.5,
+                  color: colors.textMuted,
+                  letterSpacing: 0.3,
                 ),
               ),
             ],
           ),
           const Spacer(),
           Container(
-            width: 40,
-            height: 40,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: AppTheme.accentSuccess.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
+              color: colors.success.withValues(alpha: 0.08),
               border: Border.all(
-                color: AppTheme.accentSuccess.withValues(alpha: 0.3),
+                color: colors.success.withValues(alpha: 0.2),
+                width: 0.5,
               ),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.verified_user_rounded,
-              color: AppTheme.accentSuccess,
-              size: 20,
+              color: colors.success,
+              size: 18,
             ),
           ),
         ],
@@ -149,69 +136,53 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSecurityStatusCard() {
+  Widget _statusBanner(ThemeColors colors) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
             colors: [
-              AppTheme.primaryNeon.withValues(alpha: 0.08),
-              AppTheme.primaryDark.withValues(alpha: 0.04),
+              colors.brandMain.withValues(alpha: 0.06),
+              colors.brandLight.withValues(alpha: 0.02),
             ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
           ),
-          border: Border.all(
-            color: AppTheme.borderGlow.withValues(alpha: 0.6),
-            width: 1,
-          ),
+          border: Border.all(color: colors.cardBorder, width: 0.5),
         ),
         child: Row(
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: AppTheme.primaryGradient,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryNeon.withValues(alpha: 0.4),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(16),
+                gradient: colors.brandGradient,
               ),
               child: const Icon(
                 Icons.security_rounded,
-                color: Colors.black,
-                size: 28,
+                color: Colors.white,
+                size: 24,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '澎湃防护已激活',
-                    style: GoogleFonts.orbitron(
+                    '澎湃防护系统已激活',
+                    style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.primaryNeon,
-                      letterSpacing: 1,
+                      fontWeight: FontWeight.w600,
+                      color: colors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    '系统安装拦截 · 蜜罐沙盒 · 行为审计',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
-                    ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '安装拦截 · 蜜罐沙盒 · 行为审计 · 威胁分析',
+                    style: TextStyle(fontSize: 12, color: colors.textSecondary),
                   ),
                 ],
               ),
@@ -222,33 +193,40 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _quickActions(ThemeColors colors) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle('快捷操作'),
-          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 12),
+            child: Text(
+              '安全操作',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colors.textSecondary,
+              ),
+            ),
+          ),
           Row(
             children: [
               Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.bug_report_rounded,
-                  title: '扫描APK',
-                  subtitle: '安全检测',
-                  color: AppTheme.primaryNeon,
-                  onTap: () {},
+                child: _actionTile(
+                  Icons.bug_report_rounded,
+                  'APK 安全扫描',
+                  colors.brandLight,
+                  () => _switchTo(1),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.shield_rounded,
-                  title: '蜜罐安装',
-                  subtitle: '沙盒运行',
-                  color: AppTheme.shieldGold,
-                  onTap: () => _navigateTo(1),
+                child: _actionTile(
+                  Icons.shield_rounded,
+                  '蜜罐安全安装',
+                  colors.warning,
+                  () => _switchTo(1),
                 ),
               ),
             ],
@@ -257,22 +235,20 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: [
               Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.analytics_rounded,
-                  title: '安全报告',
-                  subtitle: '行为审计',
-                  color: AppTheme.accentSuccess,
-                  onTap: () => _navigateTo(2),
+                child: _actionTile(
+                  Icons.analytics_rounded,
+                  '安全报告中心',
+                  colors.success,
+                  () => _switchTo(2),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.settings_rounded,
-                  title: '防护设置',
-                  subtitle: '策略配置',
-                  color: AppTheme.accentWarning,
-                  onTap: () => _navigateTo(3),
+                child: _actionTile(
+                  Icons.tune_rounded,
+                  '防护策略配置',
+                  colors.brandLight,
+                  () => _switchTo(3),
                 ),
               ),
             ],
@@ -282,28 +258,49 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildActiveSandboxes() {
+  Widget _activeSandboxes(ThemeColors colors) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle('活跃沙盒'),
-          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 12),
+            child: Text(
+              '活跃沙盒',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colors.textSecondary,
+              ),
+            ),
+          ),
           BlocBuilder<SandboxBloc, SandboxState>(
-            builder: (context, state) {
+            builder: (_, state) {
               if (state.activeApps.isEmpty) {
-                return _emptyStateCard(
-                  icon: Icons.inbox_rounded,
-                  title: '暂无活跃沙盒',
-                  subtitle: '选择APK进行蜜罐安全安装',
-                  actionLabel: '开始安装',
-                  onAction: () => _navigateTo(1),
+                return _emptyHint(
+                  Icons.inbox_rounded,
+                  '暂无活跃沙盒',
+                  '开始蜜罐安装',
+                  () => _switchTo(1),
+                  colors,
                 );
               }
               return Column(
                 children: state.activeApps
-                    .map((app) => _MiniSandboxCard(app: app))
+                    .map(
+                      (a) => SandboxAppListTile(
+                        app: a,
+                        onStop: () =>
+                            context.read<SandboxBloc>().add(StopSandbox(a.id)),
+                        onAnalyze: () => context.read<SandboxBloc>().add(
+                          StartAnalysis(a.id),
+                        ),
+                        onReport: () => context.read<SandboxBloc>().add(
+                          GenerateReport(a.id),
+                        ),
+                      ),
+                    )
                     .toList(),
               );
             },
@@ -313,31 +310,39 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildRecentThreats() {
+  Widget _recentThreats(ThemeColors colors) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle('近期威胁'),
-          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 12),
+            child: Text(
+              '近期威胁',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colors.textSecondary,
+              ),
+            ),
+          ),
           BlocBuilder<ReportBloc, ReportState>(
-            builder: (context, state) {
+            builder: (_, state) {
               final threats = state.reports
                   .where((r) => r.threatScore > 20)
                   .take(3)
                   .toList();
-              if (threats.isEmpty) {
-                return _emptyStateCard(
-                  icon: Icons.verified_outlined,
-                  title: '未发现近期威胁',
-                  subtitle: '您的设备安全，无需担心',
+              if (threats.isEmpty)
+                return _emptyHint(
+                  Icons.verified_outlined,
+                  '系统安全，未发现威胁',
+                  null,
+                  null,
+                  colors,
                 );
-              }
               return Column(
-                children: threats
-                    .map((r) => _ThreatMiniCard(report: r))
-                    .toList(),
+                children: threats.map((r) => _threatCard(r, colors)).toList(),
               );
             },
           ),
@@ -346,131 +351,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _sectionTitle(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.orbitron(
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.2,
-        color: AppTheme.textPrimary,
-      ),
-    );
-  }
-
-  void _navigateTo(int index) {
-    setState(() => _currentIndex = index);
-  }
-
-  Widget _buildBottomNav() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.bgSurface,
-        border: Border(
-          top: BorderSide(
-            color: AppTheme.borderGlow.withValues(alpha: 0.5),
-            width: 1,
-          ),
-        ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.dashboard_rounded,
-                label: '仪表盘',
-                isSelected: _currentIndex == 0,
-                onTap: () => _navigateTo(0),
-              ),
-              _NavItem(
-                icon: Icons.shield_rounded,
-                label: '沙盒',
-                isSelected: _currentIndex == 1,
-                onTap: () => _navigateTo(1),
-              ),
-              _NavItem(
-                icon: Icons.assignment_rounded,
-                label: '报告',
-                isSelected: _currentIndex == 2,
-                onTap: () => _navigateTo(2),
-              ),
-              _NavItem(
-                icon: Icons.settings_rounded,
-                label: '设置',
-                isSelected: _currentIndex == 3,
-                onTap: () => _navigateTo(3),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSettingsTab() {
-    return SafeArea(
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.build_rounded,
-                size: 48,
-                color: AppTheme.textSecondary,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '防护设置',
-                style: TextStyle(color: AppTheme.textPrimary, fontSize: 18),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '策略配置模块将在后续版本开放',
-                style: TextStyle(color: AppTheme.textSecondary),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _emptyStateCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
+  Widget _emptyHint(
+    IconData icon,
+    String text,
     String? actionLabel,
     VoidCallback? onAction,
-  }) {
+    ThemeColors colors,
+  ) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: AppTheme.bgCard,
+        color: colors.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderGlow.withValues(alpha: 0.5)),
+        border: Border.all(color: colors.cardBorder, width: 0.5),
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            size: 36,
-            color: AppTheme.textSecondary.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 12),
+          Icon(icon, size: 32, color: colors.textMuted.withValues(alpha: 0.4)),
+          const SizedBox(height: 10),
           Text(
-            title,
-            style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+            text,
+            style: TextStyle(color: colors.textSecondary, fontSize: 13),
           ),
           if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 14),
@@ -478,21 +380,19 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: onAction,
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
+                  horizontal: 22,
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryNeon.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppTheme.primaryNeon.withValues(alpha: 0.3),
-                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: colors.brandGradient,
                 ),
                 child: Text(
                   actionLabel,
                   style: const TextStyle(
-                    color: AppTheme.primaryNeon,
+                    color: Colors.white,
                     fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -502,39 +402,142 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-}
 
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
+  Widget _threatCard(SecurityReport r, ThemeColors colors) {
+    final color = r.threatScore > 60
+        ? colors.danger
+        : r.threatScore > 30
+        ? colors.warning
+        : colors.success;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.cardBorder, width: 0.5),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              r.threatScore > 30
+                  ? Icons.warning_rounded
+                  : Icons.check_circle_rounded,
+              color: color,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              r.appName,
+              style: TextStyle(color: colors.textPrimary, fontSize: 13),
+            ),
+          ),
+          Text(
+            '威胁 ${r.threatScore}',
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isSelected ? AppTheme.primaryNeon : AppTheme.textSecondary;
+  Widget _actionTile(
+    IconData icon,
+    String label,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: ThemeColors.of(context).card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: ThemeColors.of(context).cardBorder,
+            width: 0.5,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: ThemeColors.of(context).textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bottomNav(ThemeColors colors) {
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.navBarBackground,
+        border: Border(top: BorderSide(color: colors.navBarBorder, width: 0.5)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _navItem(Icons.dashboard_rounded, '仪表盘', 0, colors),
+              _navItem(Icons.shield_rounded, '沙盒', 1, colors),
+              _navItem(Icons.assignment_rounded, '报告', 2, colors),
+              _navItem(Icons.tune_rounded, '设置', 3, colors),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(IconData icon, String label, int idx, ThemeColors colors) {
+    final selected = _tabIndex == idx;
+    final color = selected ? colors.brandLight : colors.textMuted;
+    return GestureDetector(
+      onTap: () => _switchTo(idx),
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: color, size: 22),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                 color: color,
               ),
             ),
@@ -543,152 +546,183 @@ class _NavItem extends StatelessWidget {
       ),
     );
   }
-}
 
-class _QuickActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: AppTheme.bgCard,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
-        ),
+  Widget _settings(ThemeColors colors) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
             Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
+              '外观设置',
+              style: TextStyle(
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
+                color: colors.textSecondary,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 12),
+            BlocBuilder<ThemeBloc, ThemeState>(
+              builder: (context, themeState) {
+                return Container(
+                  decoration: BoxDecoration(
+                    color: colors.card,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: colors.cardBorder, width: 0.5),
+                  ),
+                  child: Column(
+                    children: [
+                      _themeOption(
+                        icon: Icons.brightness_auto_rounded,
+                        title: '跟随系统',
+                        subtitle: '自动切换亮色与暗色模式',
+                        selected: themeState.mode == AppThemeMode.system,
+                        onTap: () => context.read<ThemeBloc>().add(
+                          const SetThemeMode(AppThemeMode.system),
+                        ),
+                        colors: colors,
+                      ),
+                      Divider(height: 1, indent: 52, color: colors.divider),
+                      _themeOption(
+                        icon: Icons.light_mode_rounded,
+                        title: '浅色模式',
+                        subtitle: '始终使用浅色主题',
+                        selected: themeState.mode == AppThemeMode.light,
+                        onTap: () => context.read<ThemeBloc>().add(
+                          const SetThemeMode(AppThemeMode.light),
+                        ),
+                        colors: colors,
+                      ),
+                      Divider(height: 1, indent: 52, color: colors.divider),
+                      _themeOption(
+                        icon: Icons.dark_mode_rounded,
+                        title: '深色模式',
+                        subtitle: '始终使用深色主题',
+                        selected: themeState.mode == AppThemeMode.dark,
+                        onTap: () => context.read<ThemeBloc>().add(
+                          const SetThemeMode(AppThemeMode.dark),
+                        ),
+                        colors: colors,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 28),
             Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppTheme.textSecondary,
+              '关于',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colors.textSecondary,
               ),
             ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: colors.card,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: colors.cardBorder, width: 0.5),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      gradient: colors.brandGradient,
+                    ),
+                    child: const Icon(
+                      Icons.shield_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'HyperGuard 澎湃盾',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Version 1.0.0',
+                    style: TextStyle(fontSize: 13, color: colors.textSecondary),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'HyperOS Security Sandbox System',
+                    style: TextStyle(fontSize: 12, color: colors.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
-}
 
-class _MiniSandboxCard extends StatelessWidget {
-  final SandboxApp app;
-  const _MiniSandboxCard({required this.app});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.borderGlow.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.android_rounded,
-            color: AppTheme.primaryNeon,
-            size: 22,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              app.appName,
-              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+  Widget _themeOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool selected,
+    required VoidCallback onTap,
+    required ThemeColors colors,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: selected ? colors.brandLight : colors.textMuted,
+              size: 22,
             ),
-          ),
-          SecurityStatusIndicator(threatLevel: app.threatLevel, size: 14),
-        ],
-      ),
-    );
-  }
-}
-
-class _ThreatMiniCard extends StatelessWidget {
-  final SecurityReport report;
-  const _ThreatMiniCard({required this.report});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = report.threatScore > 60
-        ? AppTheme.accentDanger
-        : report.threatScore > 30
-        ? AppTheme.accentWarning
-        : AppTheme.accentSuccess;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: selected ? colors.brandLight : colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                  ),
+                ],
+              ),
             ),
-            child: Icon(
-              report.threatScore > 30
-                  ? Icons.warning_rounded
-                  : Icons.check_circle_rounded,
-              color: color,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              report.appName,
-              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
-            ),
-          ),
-          Text(
-            '威胁 ${report.threatScore}',
-            style: TextStyle(color: color, fontSize: 11),
-          ),
-        ],
+            if (selected)
+              Icon(
+                Icons.check_circle_rounded,
+                color: colors.brandLight,
+                size: 20,
+              ),
+          ],
+        ),
       ),
     );
   }
+
+  void _switchTo(int idx) => setState(() => _tabIndex = idx);
 }

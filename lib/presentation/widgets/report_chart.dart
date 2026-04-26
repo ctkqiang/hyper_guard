@@ -1,7 +1,7 @@
 import 'dart:math';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_colors.dart';
 import '../../data/models/security_report.dart';
 
 class ReportChart extends StatelessWidget {
@@ -11,17 +11,18 @@ class ReportChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = ThemeColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildThreatScore(context),
+        _threatScore(context, colors),
         const SizedBox(height: 20),
-        _buildBehaviorAnalysis(context),
+        _behaviorBars(context, colors),
       ],
     );
   }
 
-  Widget _buildThreatScore(BuildContext context) {
+  Widget _threatScore(BuildContext context, ThemeColors colors) {
     final score = report.threatScore.clamp(0, 100);
     return SizedBox(
       height: 180,
@@ -38,16 +39,16 @@ class ReportChart extends StatelessWidget {
                 sections: [
                   PieChartSectionData(
                     value: (100 - score).toDouble(),
-                    color: AppTheme.accentSuccess.withValues(alpha: 0.3),
+                    color: colors.success.withValues(alpha: 0.1),
                     showTitle: false,
                   ),
                   PieChartSectionData(
                     value: score.toDouble(),
                     color: score > 60
-                        ? AppTheme.accentDanger
+                        ? colors.danger
                         : score > 30
-                        ? AppTheme.accentWarning
-                        : AppTheme.accentSuccess,
+                        ? colors.warning
+                        : colors.success,
                     showTitle: false,
                   ),
                 ],
@@ -63,15 +64,15 @@ class ReportChart extends StatelessWidget {
                   fontSize: 36,
                   fontWeight: FontWeight.w700,
                   color: score > 60
-                      ? AppTheme.accentDanger
+                      ? colors.danger
                       : score > 30
-                      ? AppTheme.accentWarning
-                      : AppTheme.accentSuccess,
+                      ? colors.warning
+                      : colors.success,
                 ),
               ),
-              const Text(
+              Text(
                 '威胁指数',
-                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                style: TextStyle(fontSize: 12, color: colors.textSecondary),
               ),
             ],
           ),
@@ -80,31 +81,27 @@ class ReportChart extends StatelessWidget {
     );
   }
 
-  Widget _buildBehaviorAnalysis(BuildContext context) {
-    final Map<String, int> behaviorCount = {};
-    for (final event in report.behaviorEvents) {
-      behaviorCount[event.eventType] =
-          (behaviorCount[event.eventType] ?? 0) + 1;
+  Widget _behaviorBars(BuildContext context, ThemeColors colors) {
+    final Map<String, int> counts = {};
+    for (final e in report.behaviorEvents) {
+      counts[e.eventType] = (counts[e.eventType] ?? 0) + 1;
     }
-
-    final entries = behaviorCount.entries.toList();
+    final entries = counts.entries.toList();
     if (entries.isEmpty) {
-      return const Center(
-        child: Text('无异常行为记录', style: TextStyle(color: AppTheme.textSecondary)),
+      return Center(
+        child: Text('无异常行为', style: TextStyle(color: colors.textSecondary)),
       );
     }
-
     final maxCount = entries.map((e) => e.value).reduce(max).toDouble();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           '行为分析',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: colors.textPrimary,
           ),
         ),
         const SizedBox(height: 12),
@@ -122,7 +119,7 @@ class ReportChart extends StatelessWidget {
                   barRods: [
                     BarChartRodData(
                       toY: item.value.toDouble(),
-                      color: _barColor(item.key),
+                      color: _barColor(item.key, colors),
                       width: 16,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(4),
@@ -138,16 +135,15 @@ class ReportChart extends StatelessWidget {
                   sideTitles: SideTitles(
                     showTitles: true,
                     getTitlesWidget: (value, meta) {
-                      if (value.toInt() >= entries.length) {
+                      if (value.toInt() >= entries.length)
                         return const SizedBox.shrink();
-                      }
                       return Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           _behaviorLabel(entries[value.toInt()].key),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
-                            color: AppTheme.textSecondary,
+                            color: colors.textSecondary,
                           ),
                         ),
                       );
@@ -173,41 +169,19 @@ class ReportChart extends StatelessWidget {
     );
   }
 
-  Color _barColor(String eventType) {
-    switch (eventType) {
-      case 'privacy_access':
-        return AppTheme.accentDanger;
-      case 'network_request':
-        return AppTheme.accentWarning;
-      case 'file_access':
-        return AppTheme.primaryNeon;
-      case 'sms_access':
-        return AppTheme.accentDanger;
-      case 'contact_access':
-        return AppTheme.accentDanger;
-      case 'location_access':
-        return AppTheme.accentWarning;
-      default:
-        return AppTheme.primaryNeon;
-    }
-  }
+  Color _barColor(String type, ThemeColors colors) => switch (type) {
+    'privacy_access' || 'sms_access' || 'contact_access' => colors.danger,
+    'network_request' || 'location_access' => colors.warning,
+    _ => colors.brandLight,
+  };
 
-  String _behaviorLabel(String eventType) {
-    switch (eventType) {
-      case 'privacy_access':
-        return '隐私';
-      case 'network_request':
-        return '网络';
-      case 'file_access':
-        return '文件';
-      case 'sms_access':
-        return '短信';
-      case 'contact_access':
-        return '通讯录';
-      case 'location_access':
-        return '定位';
-      default:
-        return eventType;
-    }
-  }
+  String _behaviorLabel(String type) => switch (type) {
+    'privacy_access' => '隐私',
+    'network_request' => '网络',
+    'file_access' => '文件',
+    'sms_access' => '短信',
+    'contact_access' => '通讯录',
+    'location_access' => '定位',
+    _ => type,
+  };
 }
