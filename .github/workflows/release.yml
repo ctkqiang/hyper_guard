@@ -1,0 +1,48 @@
+name: 发布到 GitHub
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  release_android:
+    name: 发布 Android 应用任务
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v3
+
+      - name: 设置 Flutter (latest stable)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: stable   # always uses the latest stable release
+
+      - name: 获取 Flutter 依赖 & 运行测试
+        run: |
+          flutter pub get
+          flutter test
+        continue-on-error: true
+
+      - name: 构建 AppBundle & APK
+        run: |
+          flutter build appbundle --release
+          flutter build apk --release
+
+      - name: 上传 AAB 到 GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/app/outputs/bundle/release/app-release.aab
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传 APK 到 GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/app/outputs/flutter-apk/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 输出所有构建产物
+        run: find build -type f
