@@ -16,10 +16,10 @@ jobs:
         with:
           path: repo_workspace
 
-      - name: 设置 Flutter（固定为兼容版本）
+      - name: 设置 Flutter 3.41.8
         run: |
           cd repo_workspace
-          FLUTTER_VERSION=3.35.0
+          FLUTTER_VERSION=3.41.8
           wget -q https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz
           tar xf flutter_linux_${FLUTTER_VERSION}-stable.tar.xz
           echo "$PWD/flutter/bin" >> $GITHUB_PATH
@@ -57,11 +57,6 @@ jobs:
 
           RELEASE_ID=$(echo $RESPONSE | jq .id)
           UPLOAD_URL=$(echo $RESPONSE | jq -r .assets.links.upload_url | sed "s/{?name,link}//")
-
-          curl -s -X POST \
-            -H "Authorization: token $GITCODE_TOKEN" \
-            -F "file=@build/app/outputs/bundle/release/app-release.aab" \
-            "$UPLOAD_URL?name=app-release.aab"
 
           curl -s -X POST \
             -H "Authorization: token $GITCODE_TOKEN" \

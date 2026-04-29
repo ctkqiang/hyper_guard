@@ -14,10 +14,10 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v3
 
-      - name: 设置 Flutter（指定包含 Dart 3.11+ 的版本）
+      - name: 设置 Flutter 3.41.8（包含 Dart 3.11+）
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.0'   # 该版本内置 Dart 3.11.2，满足 ^3.11.5
+          flutter-version: '3.41.8'
 
       - name: 安装依赖并运行测试
         run: |
@@ -29,13 +29,6 @@ jobs:
         run: |
           flutter build appbundle --release
           flutter build apk --release
-
-      - name: 上传 AAB 到 GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: build/app/outputs/bundle/release/app-release.aab
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 上传 APK 到 GitHub Release
         uses: softprops/action-gh-release@v1
