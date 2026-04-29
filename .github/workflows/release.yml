@@ -14,10 +14,10 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v3
 
-      - name: 设置 Flutter（指定具体稳定版，避免识别错误）
+      - name: 设置 Flutter（指定包含 Dart 3.11+ 的版本）
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.4'    # 使用具体版本而非 'stable'
+          flutter-version: '3.35.0'   # 该版本内置 Dart 3.11.2，满足 ^3.11.5
 
       - name: 安装依赖并运行测试
         run: |
