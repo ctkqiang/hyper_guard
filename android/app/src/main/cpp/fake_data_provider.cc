@@ -85,6 +85,7 @@ std::string FakeDataProvider::get_fake_phone_number() {
   static std::mt19937 gen(rd());
   static std::uniform_int_distribution<> dis(0, 9);
   std::string number = "+86138";
+
   for (int i = 0; i < 8; i++) {
     number += std::to_string(dis(gen));
   }
