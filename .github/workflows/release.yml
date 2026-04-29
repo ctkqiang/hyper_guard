@@ -7,25 +7,25 @@ on:
 
 jobs:
   release_android:
-    name: 发布 Android 应用任务
+    name: 发布 Android 应用
     runs-on: ubuntu-latest
 
     steps:
       - name: 检出代码
         uses: actions/checkout@v3
 
-      - name: 设置 Flutter (latest stable)
+      - name: 设置 Flutter（指定具体稳定版，避免识别错误）
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: stable   # always uses the latest stable release
+          flutter-version: '3.27.4'    # 使用具体版本而非 'stable'
 
-      - name: 获取 Flutter 依赖 & 运行测试
+      - name: 安装依赖并运行测试
         run: |
           flutter pub get
           flutter test
         continue-on-error: true
 
-      - name: 构建 AppBundle & APK
+      - name: 构建 AppBundle 与 APK
         run: |
           flutter build appbundle --release
           flutter build apk --release
@@ -44,5 +44,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 输出所有构建产物
+      - name: 列出构建产物
         run: find build -type f
