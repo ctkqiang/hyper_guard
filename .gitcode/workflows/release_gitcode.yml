@@ -41,9 +41,17 @@ jobs:
         env:
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
           VERSION_TAG: "v$(date +'%Y%m%d%H%M%S')"
+          PROJECT_ID: ${{ CI_PROJECT_ID }}
+          PROJECT_PATH: ${{ CI_PROJECT_PATH }}
         run: |
           cd repo_workspace
           sudo apt-get update && sudo apt-get install -y jq
+
+          PROJECT_REF="${PROJECT_ID:-$PROJECT_PATH}"
+          if [ -z "$PROJECT_REF" ]; then
+            echo "ERROR: 无法获取项目标识，CI_PROJECT_ID 和 CI_PROJECT_PATH 均未设置"
+            exit 1
+          fi
 
           RESPONSE=$(curl -s -X POST \
             -H "Authorization: token $GITCODE_TOKEN" \
@@ -53,10 +61,15 @@ jobs:
               \"name\": \"Release $VERSION_TAG\",
               \"body\": \"CI/CD 自动发布的版本\"
             }" \
-            https://gitcode.net/api/v4/projects/${{CI_PROJECT_ID}}/releases)
+            "https://gitcode.net/api/v4/projects/${PROJECT_REF}/releases")
 
-          RELEASE_ID=$(echo $RESPONSE | jq .id)
-          UPLOAD_URL=$(echo $RESPONSE | jq -r .assets.links.upload_url | sed "s/{?name,link}//")
+          if echo "$RESPONSE" | jq -e '.message' > /dev/null 2>&1; then
+            echo "创建 Release 失败: $RESPONSE"
+            exit 1
+          fi
+
+          RELEASE_ID=$(echo "$RESPONSE" | jq -r '.id')
+          UPLOAD_URL=$(echo "$RESPONSE" | jq -r '.assets.links.upload_url' | sed 's/{?name,link}//')
 
           curl -s -X POST \
             -H "Authorization: token $GITCODE_TOKEN" \
