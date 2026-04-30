@@ -8,7 +8,7 @@
     *;
 }
 
--keep class xin.ctkqiangmote .hyper_guard.DeviceUtil { *; }
+-keep class xin.ctkqiang.hyper_guard.DeviceUtil { *; }
 -keep class xin.ctkqiang.hyper_guard.InstallInterceptor { *; }
 -keep class xin.ctkqiang.hyper_guard.InstallInterceptor$* { *; }
 -keep class xin.ctkqiang.hyper_guard.MainActivity { *; }
