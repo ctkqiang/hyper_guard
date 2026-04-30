@@ -20,6 +20,7 @@
 -keepattributes *Annotation*
 -keepattributes SourceFile,LineNumberTable
 
+
 -keepclasseswithmembernames class * {
     native <methods>;
 }
